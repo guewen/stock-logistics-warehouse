@@ -31,6 +31,10 @@ class StockLocation(models.Model):
         help="Used to know if a cell of a Tray location is empty.",
     )
     tray_matrix = Serialized(string='Cells', compute='_compute_tray_matrix')
+    x_prefix = fields.Char('X prefix', default="x", )
+    y_prefix = fields.Char('Y prefix', default="y", )
+    xy_padding = fields.Integer("XY Padding", default=2, )
+    y_first = fields.Boolean('Y first?', default=False, )
 
     # TODO document hierarchy
     # Vertical Lift View
@@ -114,6 +118,10 @@ class StockLocation(models.Model):
     @api.multi
     def write(self, vals):
         for location in self:
+            # Update cell posz value.
+            if 'posz' in vals and 'vertical_lift_tray_type_id' not in vals:
+                if location.vertical_lift_kind == 'tray':
+                    location.child_ids.write({'posz': vals['posz']})
             trays_to_update = False
             if 'vertical_lift_tray_type_id' in vals:
                 new_tray_type_id = vals.get('vertical_lift_tray_type_id')
@@ -169,6 +177,17 @@ class StockLocation(models.Model):
         return cells
 
     @api.multi
+    def _get_subloc_name(self, x, y):
+        p = self.xy_padding
+        if self.y_first:
+            fp, sp, f, s = self.y_prefix, self.x_prefix, y, x
+        else:
+            fp, sp, f, s = self.x_prefix, self.y_prefix, x, y
+        return "{}{}{}{}".format(
+            fp or '', str(f).zfill(p), sp or '', str(s).zfill(p)
+        )
+
+    @api.multi
     def _update_tray_sublocations(self):
         values = []
         for location in self:
@@ -192,12 +211,14 @@ class StockLocation(models.Model):
                 continue
 
             # create accepts several records now
+            posz = location.posz or 0
             for row in range(1, tray_type.rows + 1):
                 for col in range(1, tray_type.cols + 1):
                     subloc_values = {
-                        'name': _('x{}y{}').format(col, row),
+                        'name': location._get_subloc_name(col, row),
                         'posx': col,
                         'posy': row,
+                        'posz': posz,
                         'location_id': location.id,
                         'company_id': location.company_id.id,
                     }
@@ -243,3 +264,4 @@ class StockLocation(models.Model):
                         'noupdate': tray_external.noupdate,
                     }
                 )
+

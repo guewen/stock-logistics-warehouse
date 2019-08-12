@@ -15,6 +15,16 @@
         <group string="Vertical Lift" name="vertical_lift"
                attrs="{'invisible': [('vertical_lift_kind', 'not in', ('shuttle', 'tray', 'cell'))]}">
           <field name="vertical_lift_kind"/>
+        </group>
+        <group string="Vertical Lift naming convention" name="vertical_lift_naming"
+               attrs="{'invisible': [('vertical_lift_kind', '!=', 'tray')]}">
+          <field name="x_prefix"/>
+          <field name="y_prefix"/>
+          <field name="xy_padding"/>
+          <field name="y_first"/>
+        </group>
+        <group string="Vertical Lift location" name="vertical_lift_location"
+               attrs="{'invisible': [('vertical_lift_kind', 'not in', ('tray', 'cell'))]}">
           <field name="vertical_lift_tray_type_id"
                  attrs="{'invisible': [('vertical_lift_kind', '!=', 'tray')], 'required': [('vertical_lift_kind', '=', 'tray')]}"/>
           <field name="tray_matrix"
@@ -29,6 +39,9 @@
         <attribute name="attrs">{'readonly': [('vertical_lift_kind', '=', 'cell')]}</attribute>
       </field>
       <field name="posy" position="attributes">
+        <attribute name="attrs">{'readonly': [('vertical_lift_kind', '=', 'cell')]}</attribute>
+      </field>
+      <field name="posz" position="attributes">
         <attribute name="attrs">{'readonly': [('vertical_lift_kind', '=', 'cell')]}</attribute>
       </field>
     </field>
