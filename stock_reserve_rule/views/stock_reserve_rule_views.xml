@@ -20,6 +20,7 @@
           <group string="Conditions" name="conditions">
             <field name="rule_domain" widget="domain"  options="{'model': 'stock.move'}" />
             <field name="only_full_quantity"/>
+            <field name="full_packaging"/>
           </group>
         </group>
       </form>

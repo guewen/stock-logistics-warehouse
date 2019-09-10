@@ -36,6 +36,7 @@ class StockReserveRule(models.Model):
     active = fields.Boolean(default=True)
     # TODO move in additional module
     only_full_quantity = fields.Boolean(default=False)
+    full_packaging = fields.Boolean(default=False)
     # TODO tags stored on procurement.group?
 
     @api.constrains("parent_id")
@@ -96,6 +97,12 @@ class StockReserveRule(models.Model):
             )
             locations -= base_locations - full_locs
 
+        if self.full_packaging:
+            full_locs = self._rule_eval_full_packaging(
+                move, need, quants_by_location
+            )
+            locations -= base_locations - full_locs
+
         result = []
         for location in locations:
             quants = quants_by_location[location]
@@ -137,4 +144,54 @@ class StockReserveRule(models.Model):
             # we'll empty a bin so we add this location to the list
             if float_compare(need, location_quantity, rounding) != -1:
                 locations |= location
+        return locations
+
+    def _rule_eval_full_packaging(self, move, need, quants_by_location):
+        def is_greater_eq(value, other):
+            return (
+                float_compare(value, other, precision_rounding=rounding) >= 0
+            )
+
+        # TODO glue module with?
+        # https://github.com/OCA/stock-logistics-warehouse/pull/695
+        # we'll walk the packagings from largest to smallest to have the
+        # largest containers as possible (1 pallet rather than 10 boxes)
+        packaging_quantities = sorted(
+            move.product_id.packaging_ids.mapped("qty"), reverse=True
+        )
+        if not packaging_quantities:
+            return self.env["stock.location"].browse(
+                l.id for l in quants_by_location
+            )
+
+        rounding = move.product_id.uom_id.rounding
+
+        locations = self.env["stock.location"].browse()
+
+        for location, quants in quants_by_location.items():
+            location_quantity = sum(quants.mapped("quantity")) - sum(
+                quants.mapped("reserved_quantity")
+            )
+
+            for pack_quantity in packaging_quantities:
+                # TODO check this...
+                while is_greater_eq(location_quantity, need) and is_greater_eq(
+                    need, pack_quantity
+                ):
+                    if is_greater_eq(
+                        location_quantity, pack_quantity
+                    ) and is_greater_eq(need, location_quantity):
+                        # FIXME should be only the packaging's size? but
+                        # then we have an issue as rules do not take
+                        # quantity into account, they only include/exclude
+                        # locations (and how to deal with conflicting rules
+                        # if a rule specifies quantity)
+                        need -= pack_quantity
+                        location_quantity -= pack_quantity
+                        locations |= location
+                    else:
+                        break
+
+        # TODO must be able to return a quantity for a location (eg one pallet,
+        # not the whole bin)?
         return locations
