@@ -19,6 +19,8 @@ class StockLocation(models.Model):
     def _check_routing_operation_picking_type_id(self):
         for location in self:
             picking_type = location.routing_operation_picking_type_id
+            if not picking_type:
+                continue
             if picking_type.default_location_src_id != location:
                 raise ValidationError(_(
                     'A picking type for routing operations cannot have a'
@@ -30,7 +32,8 @@ class StockLocation(models.Model):
     def _find_picking_type_for_routing_operation(self):
         self.ensure_one()
         # First select all the parent locations and the matching
-        # picking types. In a second step, the picking type matching the closest location
+        # picking types. In a second step, the picking type matching the
+        # closest location
         # is searched in memory. This is to avoid doing an SQL query
         # for each location in the tree.
         tree = self.search(
