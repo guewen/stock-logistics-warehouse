@@ -2,7 +2,7 @@
 # Copyright 2016-2019 Jacques-Etienne Baudoux (BCIM) <je@bcim.be>
 # Copyright 2019 Camptocamp SA
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl)
-from odoo import models, fields, api
+from odoo import api, fields, models
 
 
 class StockLocation(models.Model):
@@ -17,17 +17,13 @@ class StockLocation(models.Model):
              ".{level:0>2}'")
 
     area = fields.Char(
-        'Area',
-        compute='_compute_area',
+        string='Area',
+        # Field used for _onchange_attribute_compute_name, so we
+        # have the name in the record's cache. Does not need to be
+        # stored as we already have 'area_location_id'
+        related='area_location_id.name',
+        readonly=True,
     )
-
-    @api.depends('name', 'location_kind', 'location_id.area')
-    def _compute_area(self):
-        for location in self:
-            if location.location_kind == 'area':
-                location.area = location.name
-            else:
-                location.area = location.location_id.area
 
     @api.multi
     @api.onchange('corridor', 'row', 'rack', 'level',
