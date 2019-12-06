@@ -1,6 +1,6 @@
 # Copyright 2019 Camptocamp (https://www.camptocamp.com)
 {
-    'name': "Stock Picking Zone",
+    'name': "Stock Routing Operation",
     'summary': "Add extra routing operations for special locations",
     'author': 'Camptocamp, Odoo Community Association (OCA)',
     'website': "https://github.com/OCA/stock-logistics-warehouse",

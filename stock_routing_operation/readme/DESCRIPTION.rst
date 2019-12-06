@@ -20,8 +20,9 @@ A product can be stored either in the High-Bay, either in the Shelving zone.
 When picking:
 
 When there is enough stock in the Shelving, you expect the moves to have the
-usual Pick(Highbay)-Pack-Ship steps. If the good is picked from the High-Bay, you will
-need an extra operation: Pick(Highbay)-Handover-Pack-Ship.
+usual Pick(from Shelving)-Pack-Ship steps. If the good is picked from the
+High-Bay, you will need an extra operation: Pick(from
+Highbay)-Handover-Pack-Ship.
 
 This is what this feature is doing: on the High-Bay location, you define
 a "routing operation". A routing operation is based on a picking type.
