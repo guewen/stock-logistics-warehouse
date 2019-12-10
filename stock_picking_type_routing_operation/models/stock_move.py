@@ -21,6 +21,16 @@ class StockMove(models.Model):
         dest_moves = self._split_per_dest_routing_operation()
         dest_moves._apply_move_location_dest_routing_operation()
 
+    def _bypass_routing_operation_application(self, routing_type):
+        """ Override this method if you need to by pass the routing operation
+        logic for moves related characteristic.
+        """
+        if routing_type not in ('src', 'dest'):
+            raise ValueError(
+                "routing_type must be one of ('src', 'dest')"
+            )
+        return False
+
     def _split_per_src_routing_operation(self):
         """Split moves per source routing operations
 
@@ -35,7 +45,10 @@ class StockMove(models.Model):
         move_to_assign_ids = set()
         new_move_per_location = {}
         for move in self:
-            if move.state not in ("assigned", "partially_available"):
+            if move.state not in (
+                "assigned",
+                "partially_available",
+            ) or move._bypass_routing_operation_application("src"):
                 continue
 
             # Group move lines per source location, some may need an additional
@@ -116,7 +129,10 @@ class StockMove(models.Model):
         after it.
         """
         for move in self:
-            if move.state not in ("assigned", "partially_available"):
+            if move.state not in (
+                "assigned",
+                "partially_available",
+            ) or move._bypass_routing_operation_application("src"):
                 continue
 
             # Group move lines per source location, some may need an additional
@@ -217,7 +233,10 @@ class StockMove(models.Model):
         """
         new_moves = self.browse()
         for move in self:
-            if move.state not in ("assigned", "partially_available"):
+            if move.state not in (
+                "assigned",
+                "partially_available",
+            ) or move._bypass_routing_operation_application("dest"):
                 continue
 
             # Group move lines per destination location, some may need an
@@ -275,7 +294,10 @@ class StockMove(models.Model):
         after it.
         """
         for move in self:
-            if move.state not in ("assigned", "partially_available"):
+            if move.state not in (
+                "assigned",
+                "partially_available",
+            ) or move._bypass_routing_operation_application("dest"):
                 continue
 
             # Group move lines per source location, some may need an additional
