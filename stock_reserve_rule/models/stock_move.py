@@ -117,20 +117,25 @@ class StockMove(models.Model):
                 # Then if there is still a need, we split the current move to
                 # get a new one targetting the fallback location with the
                 # remaining qties
+                # TODO can we replace the computed field by 'reserved' + reserved_fallback?
                 still_need = self.product_uom_qty - self.reserved_availability
                 if still_need:
-                    qty_split = self.product_uom._compute_quantity(
-                        still_need,
-                        self.product_id.uom_id,
-                        rounding_method="HALF-UP",
-                    )
-                    new_move_id = self._split(qty_split)
-                    new_move = self.browse(new_move_id)
-                    new_move.location_id = rule.fallback_location_id
-                    # Shunt the caller '_action_assign' by telling that all
-                    # the need has been reserved to get the current move
-                    # updated to the state 'assigned'
-                    return reserved + reserved_fallback + new_move.product_uom_qty
+                    if not self.reserved_availability:
+                        self.location_id = rule.fallback_location_id
+                        return 0
+                    else:
+                        qty_split = self.product_uom._compute_quantity(
+                            still_need,
+                            self.product_id.uom_id,
+                            rounding_method="HALF-UP",
+                        )
+                        new_move_id = self._split(qty_split)
+                        new_move = self.browse(new_move_id)
+                        new_move.location_id = rule.fallback_location_id
+                        # Shunt the caller '_action_assign' by telling that all
+                        # the need has been reserved to get the current move
+                        # updated to the state 'assigned'
+                        return reserved + reserved_fallback + new_move.product_uom_qty
                 return reserved + reserved_fallback
 
             else:
