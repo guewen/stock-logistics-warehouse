@@ -4,7 +4,7 @@ Example of use case:
 
 * We use several operation types for Picking Transfers (Pick Shelves, Pick Reserve)
 * We use several operation types for Packing (Pack, Pack Post)
-* The "Group" flag is activated on the 2 Packing operation types
+* The "Checkout Synchronization" flag is activated on the 2 Packing operation types
 * The Packing can occur in several areas (Packing/PACK1, Packing/PACK2, Packing/PACK3)
 
 Based on these assumptions, we have these pickings, all for the same order:
@@ -14,7 +14,8 @@ Based on these assumptions, we have these pickings, all for the same order:
 * PACK001, pack 3 of the goods (2 from SHELF001, 1 from RESER001)
 * PPOST001, pack the remaining good of the reserve
 
-The operator moves a good of SHELF001 in Packing/PACK2.
+The operator uses the button "Checkout Sync" on a pick transfer,
+for instance SHELF001, and select Packing/PACK2 as destination.
 We want all the lines that reach PACK001 to be updated with:
 
 * The move lines (except the one that goes to PPOST001) must now reach

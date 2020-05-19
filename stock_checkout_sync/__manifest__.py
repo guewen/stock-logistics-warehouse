@@ -1,8 +1,8 @@
 # Copyright 2020 Camptocamp SA
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl)
 {
-    "name": "Stock Move Common Dest Sync Location",
-    "summary": "Sync location destination for common dest moves",
+    "name": "Stock Checkout Synchronization",
+    "summary": "Sync location for Checkout operations",
     "version": "13.0.1.0.0",
     "development_status": "Alpha",
     "category": "Warehouse Management",
@@ -12,5 +12,9 @@
     "application": False,
     "installable": True,
     "depends": ["stock_move_common_dest"],
-    "data": ["views/stock_picking_type.xml"],
+    "data": [
+        "views/stock_picking_type_views.xml",
+        "views/stock_picking_views.xml",
+        "wizards/stock_move_checkout_sync_views.xml",
+    ],
 }
