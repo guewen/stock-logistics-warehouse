@@ -1,11 +1,12 @@
 # Copyright 2019 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
 import logging
+from collections import namedtuple
 
 from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
 from odoo.osv import expression
-from odoo.tools.float_utils import float_compare
+from odoo.tools.float_utils import float_compare, float_is_zero
 from odoo.tools.safe_eval import safe_eval
 
 _logger = logging.getLogger(__name__)
@@ -110,6 +111,10 @@ class StockReserveRuleRemoval(models.Model):
     _description = "Stock Reservation Rule Removal"
     _order = "sequence, id"
 
+    # used to filter on quants selected by a reservation rule
+    QuantProperties = namedtuple("QuantProperties", "lot package owner")
+    QuantProperties.__new__.__defaults__ = (None,) * len(QuantProperties._fields)
+
     rule_id = fields.Many2one(
         comodel_name="stock.reserve.rule", required=True, ondelete="cascade"
     )
@@ -211,6 +216,7 @@ class StockReserveRuleRemoval(models.Model):
                 quant.location_id,
                 quant.quantity - quant.reserved_quantity,
                 need,
+                self.QuantProperties(),
             )
 
     def _apply_strategy_empty_bin(self, quants):
@@ -245,13 +251,14 @@ class StockReserveRuleRemoval(models.Model):
                 continue
 
             if float_compare(need, location_quantity, rounding) != -1:
-                need = yield location, location_quantity, need
+                need = yield location, location_quantity, need, self.QuantProperties()
 
     def _apply_strategy_packaging(self, quants):
         need = yield
         # Group by location (in this removal strategies, we want to consider
         # the total quantity held in a location).
-        quants_per_bin = quants._group_by_location()
+        # we take only packages here
+        quants = quants.filtered("package_id")
 
         product = fields.first(quants).product_id
 
@@ -275,31 +282,46 @@ class StockReserveRuleRemoval(models.Model):
 
         rounding = product.uom_id.rounding
 
+        def is_eq(value, other):
+            return float_compare(value, other, precision_rounding=rounding) == 0
+
         def is_greater_eq(value, other):
             return float_compare(value, other, precision_rounding=rounding) >= 0
 
-        for pack_quantity in packaging_quantities:
-            # Get quants quantity on each loop because they may change.
-            # Sort by max quant first so we have more chance to take a full
-            # package. But keep the original ordering for equal quantities!
-            bins = sorted(
-                [
-                    (
-                        sum(quants.mapped("quantity"))
-                        - sum(quants.mapped("reserved_quantity")),
-                        location,
-                    )
-                    for location, quants in quants_per_bin
-                ],
-                reverse=True,
-            )
+        def is_zero(value):
+            return float_is_zero(value, precision_rounding=rounding)
 
-            for location_quantity, location in bins:
-                if location_quantity <= 0:
-                    continue
-                enough_for_packaging = is_greater_eq(location_quantity, pack_quantity)
-                asked_more_than_packaging = is_greater_eq(need, pack_quantity)
-                if enough_for_packaging and asked_more_than_packaging:
-                    # compute how much packaging we can get
-                    take = (need // pack_quantity) * pack_quantity
-                    need = yield location, location_quantity, take
+        used_locations = self.env["stock.location"].browse()
+        for pack_quantity in packaging_quantities:
+            while is_greater_eq(need, pack_quantity):
+                # Get quants quantity on each loop because they may change.
+                # Sort by max quant first so we have more chance to take a full
+                # package. But keep the original ordering for equal quantities!
+                sorted_quants = quants.filtered(
+                    # ignore already exhausted quants...
+                    lambda q: not is_zero(q.quantity - q.reserved_quantity)
+                ).sorted(
+                    lambda q: (
+                        # try to pick first in locations where we already pick
+                        # something, to limit the number of locations to visit
+                        # (physically)
+                        q.location_id in used_locations,
+                        q.quantity - q.reserved_quantity,
+                    ),
+                    reverse=True,
+                )
+
+                for quant in sorted_quants:
+                    available = quant.quantity - quant.reserved_quantity
+                    if is_eq(available, pack_quantity):
+                        used_locations |= quant.location_id
+                        need = (
+                            yield quant.location_id,
+                            available,
+                            available,
+                            self.QuantProperties(package=quant.package_id),
+                        )
+                        break
+                else:
+                    # no quant with enough availability for this packaging
+                    break

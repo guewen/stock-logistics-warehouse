@@ -29,6 +29,9 @@ class TestReserveRule(common.SavepointCase):
         cls.loc_zone1_bin2 = cls.env["stock.location"].create(
             {"name": "Zone1 Bin2", "location_id": cls.loc_zone1.id}
         )
+        cls.loc_zone1_bin3 = cls.env["stock.location"].create(
+            {"name": "Zone1 Bin3", "location_id": cls.loc_zone1.id}
+        )
         cls.loc_zone2 = cls.env["stock.location"].create(
             {"name": "Zone2", "location_id": cls.wh.lot_stock_id.id}
         )
@@ -101,8 +104,18 @@ class TestReserveRule(common.SavepointCase):
             )
         return picking
 
-    def _update_qty_in_location(self, location, product, quantity):
-        self.env["stock.quant"]._update_available_quantity(product, location, quantity)
+    @classmethod
+    def _update_qty_in_location(
+        cls, location, product, quantity, package=None, lot=None
+    ):
+        quants = cls.env["stock.quant"]._gather(
+            product, location, lot_id=lot, package_id=package, strict=True
+        )
+        # this method adds the quantity to the current quantity, so remove it
+        quantity -= sum(quants.mapped("quantity"))
+        cls.env["stock.quant"]._update_available_quantity(
+            product, location, quantity, package_id=package, lot_id=lot
+        )
 
     def _create_rule(self, rule_values, removal_values):
         rule_config = {
@@ -559,6 +572,76 @@ class TestReserveRule(common.SavepointCase):
                 {"location_id": self.loc_zone1_bin2.id, "product_qty": 500.0},
                 {"location_id": self.loc_zone2_bin2.id, "product_qty": 50.0},
                 {"location_id": self.loc_zone3_bin1.id, "product_qty": 10.0},
+            ],
+        )
+        self.assertEqual(move.state, "assigned")
+
+    def test_rule_packaging_mixed_location(self):
+        # we take only packaging from a location which contains packagings +
+        # units, check that we take only packagings even if the fefo/fifo
+        # would take units first
+        package1 = self.env["stock.quant.package"].create({"name": "P1"})
+        package2 = self.env["stock.quant.package"].create({"name": "P2"})
+        package3 = self.env["stock.quant.package"].create({"name": "P3"})
+        package4 = self.env["stock.quant.package"].create({"name": "P4"})
+        self._setup_packagings(
+            self.product1,
+            [
+                ("Transport Box", 144, self.transport_box),
+                ("Retail Box", 12, self.retail_box),
+            ],
+        )
+        self._update_qty_in_location(self.loc_zone1_bin1, self.product1, 60)
+        self._update_qty_in_location(
+            self.loc_zone1_bin1, self.product1, 144, package=package1
+        )
+        self._update_qty_in_location(
+            self.loc_zone1_bin2, self.product1, 144, package=package2
+        )
+        self._update_qty_in_location(
+            self.loc_zone1_bin3, self.product1, 144, package=package3
+        )
+        # this package being in the same location as package1, we expect it to be picked,
+        # we'll minimize the number of locations to get packages from
+        self._update_qty_in_location(
+            self.loc_zone1_bin1, self.product1, 144, package=package4
+        )
+        picking = self._create_picking(self.wh, [(self.product1, 432)])
+
+        self._create_rule(
+            {},
+            [
+                {
+                    "location_id": self.loc_zone1.id,
+                    "sequence": 1,
+                    "removal_strategy": "packaging",
+                },
+                {"location_id": self.loc_zone2.id, "sequence": 3},
+                {"location_id": self.loc_zone3.id, "sequence": 3},
+            ],
+        )
+        picking.action_assign()
+        move = picking.move_lines
+        ml = move.move_line_ids
+
+        self.assertRecordValues(
+            ml.sorted(lambda l: l.package_id.name),
+            [
+                {
+                    "location_id": self.loc_zone1_bin1.id,
+                    "product_qty": 144.0,
+                    "package_id": package1.id,
+                },
+                {
+                    "location_id": self.loc_zone1_bin2.id,
+                    "product_qty": 144.0,
+                    "package_id": package2.id,
+                },
+                {
+                    "location_id": self.loc_zone1_bin1.id,
+                    "product_qty": 144.0,
+                    "package_id": package4.id,
+                },
             ],
         )
         self.assertEqual(move.state, "assigned")
