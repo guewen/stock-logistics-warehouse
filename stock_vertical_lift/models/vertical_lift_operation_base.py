@@ -345,7 +345,7 @@ class VerticalLiftOperationTransfer(models.AbstractModel):
     @api.depends("current_move_line_id.product_id.packaging_ids")
     def _compute_product_packagings(self):
         for record in self:
-            product = record.mapped("current_move_line_id.product_id")
+            product = record.current_move_line_id.product_id
             if not product:
                 record.product_packagings = ""
                 continue

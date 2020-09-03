@@ -143,7 +143,7 @@ class VerticalLiftOperationInventory(models.Model):
     @api.depends("current_inventory_line_id.product_id.packaging_ids")
     def _compute_product_packagings(self):
         for record in self:
-            product = record.mapped("current_inventory_line_id.product_id")
+            product = record.current_inventory_line_id.product_id
             if not product:
                 record.product_packagings = ""
                 continue
